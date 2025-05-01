@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Attendance Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+  <header class="mb-6 text-center">
+    <h1 class="text-3xl font-semibold text-gray-800">Student Attendance Tracker</h1>
+    <p class="text-gray-600 mt-1">Add students, mark attendance, and track attendance records</p>
+  </header>
+
+  <section class="w-full max-w-4xl bg-white rounded-lg shadow p-6">
+    <form id="addStudentForm" class="flex flex-col sm:flex-row gap-4 mb-6">
+      <input
+        type="text"
+        id="studentName"
+        placeholder="Enter student name"
+        class="flex-grow border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        required
+      />
+      <button
+        type="submit"
+        class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition"
+        aria-label="Add student"
+      >
+        <i class="fas fa-user-plus mr-2"></i> Add Student
+      </button>
+    </form>
+
+    <div class="overflow-x-auto">
+      <table class="w-full table-auto border-collapse border border-gray-200">
+        <thead class="bg-indigo-100 text-indigo-700">
+          <tr>
+            <th class="border border-gray-300 px-4 py-2 text-left">Student</th>
+            <th class="border border-gray-300 px-4 py-2 text-center">QR Code</th>
+            <th class="border border-gray-300 px-4 py-2 text-center">Present</th>
+            <th class="border border-gray-300 px-4 py-2 text-center">Absent</th>
+          </tr>
+        </thead>
+        <tbody id="studentList" class="divide-y divide-gray-200"></tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 text-gray-700 font-semibold">
+      <p>Total Students: <span id="totalStudents">0</span></p>
+      <p>Present: <span id="totalPresent">0</span></p>
+      <p>Absent: <span id="totalAbsent">0</span></p>
+    </div>
+  </section>
+
+  <script>
+    const studentListEl = document.getElementById('studentList');
+    const totalStudentsEl = document.getElementById('totalStudents');
+    const totalPresentEl = document.getElementById('totalPresent');
+    const totalAbsentEl = document.getElementById('totalAbsent');
+    const addStudentForm = document.getElementById('addStudentForm');
+    const studentNameInput = document.getElementById('studentName');
+
+    // Load students from localStorage or initialize empty array
+    let students = JSON.parse(localStorage.getItem('students')) || [];
+
+    function saveStudents() {
+      localStorage.setItem('students', JSON.stringify(students));
+    }
+
+    function updateSummary() {
+      totalStudentsEl.textContent = students.length;
+      const presentCount = students.filter(s => s.attendance === 'present').length;
+      const absentCount = students.filter(s => s.attendance === 'absent').length;
+      totalPresentEl.textContent = presentCount;
+      totalAbsentEl.textContent = absentCount;
+    }
+
+    function generateUniqueId() {
+      // Simple unique ID generator (could be improved)
+      return 'stu-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    }
+
+    function createStudentRow(student) {
+      const tr = document.createElement('tr');
+
+      // Student name cell
+      const nameTd = document.createElement('td');
+      nameTd.className = 'border border-gray-300 px-4 py-2';
+      nameTd.textContent = student.name;
+      tr.appendChild(nameTd);
+
+      // QR code cell
+      const qrTd = document.createElement('td');
+      qrTd.className = 'border border-gray-300 px-4 py-2 text-center';
+      const qrCanvas = document.createElement('canvas');
+      qrTd.appendChild(qrCanvas);
+      QRCode.toCanvas(qrCanvas, student.id, { width: 64, margin: 1 }, function (error) {
+        if (error) console.error(error);
+      });
+      tr.appendChild(qrTd);
+
+      // Present checkbox cell
+      const presentTd = document.createElement('td');
+      presentTd.className = 'border border-gray-300 px-4 py-2 text-center';
+      const presentInput = document.createElement('input');
+      presentInput.type = 'radio';
+      presentInput.name = 'attendance-' + student.id;
+      presentInput.checked = student.attendance === 'present';
+      presentInput.setAttribute('aria-label', `Mark ${student.name} as present`);
+      presentInput.addEventListener('change', () => {
+        student.attendance = 'present';
+        saveStudents();
+        updateSummary();
+      });
+      presentTd.appendChild(presentInput);
+      tr.appendChild(presentTd);
+
+      // Absent checkbox cell
+      const absentTd = document.createElement('td');
+      absentTd.className = 'border border-gray-300 px-4 py-2 text-center';
+      const absentInput = document.createElement('input');
+      absentInput.type = 'radio';
+      absentInput.name = 'attendance-' + student.id;
+      absentInput.checked = student.attendance === 'absent';
+      absentInput.setAttribute('aria-label', `Mark ${student.name} as absent`);
+      absentInput.addEventListener('change', () => {
+        student.attendance = 'absent';
+        saveStudents();
+        updateSummary();
+      });
+      absentTd.appendChild(absentInput);
+      tr.appendChild(absentTd);
+
+      return tr;
+    }
+
+    function renderStudentList() {
+      studentListEl.innerHTML = '';
+      students.forEach(student => {
+        const row = createStudentRow(student);
+        studentListEl.appendChild(row);
+      });
+      updateSummary();
+    }
+
+    addStudentForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = studentNameInput.value.trim();
+      if (!name) return;
+      const newStudent = {
+        id: generateUniqueId(),
+        name,
+        attendance: null,
+      };
+      students.push(newStudent);
+      saveStudents();
+      renderStudentList();
+      studentNameInput.value = '';
+      studentNameInput.focus();
+    });
+
+    // Initial render
+    renderStudentList();
+  </script>
+</body>
+</html>
